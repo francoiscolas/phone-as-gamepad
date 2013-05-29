@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "node-static": "0.6.9",
+    "websocket"  : "1.0.8"
+  }
+}

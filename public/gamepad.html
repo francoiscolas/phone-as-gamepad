@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Phone As Gamepad (Mobile)</title>
+        <script>
+            //
+            // Ui class
+
+            var Ui = function (options) {
+                this.socket = options.socket;
+                window.addEventListener('touchstart', this._onTouchMove.bind(this), false);
+                window.addEventListener('touchmove', this._onTouchMove.bind(this), false);
+                window.addEventListener('touchend', this._onTouchEnd.bind(this), false);
+            };
+
+            Ui.prototype._onTouchMove = function (event) {
+                event.preventDefault();
+                var touch = event.changedTouches[0];
+                var now   = Date.now();
+
+                if ((now - this.lastMove) < 100) return false;
+                this.lastMove = now;
+                this.socket.send('move', {
+                    x: Math.round(100 * 100 * touch.clientX / window.innerWidth) / 100,
+                    y: Math.round(100 * 100 * touch.clientY / window.innerHeight) / 100
+                });
+                return false;
+            };
+
+            Ui.prototype._onTouchEnd = function (event) {
+                this.socket.send('stop');
+                return false;
+            };
+
+
+            //
+            // Socket class
+
+            var Socket = function (url) {
+                this.url = null;
+                this.id  = null;
+                this.ws  = null;
+                this.open(url);
+            };
+
+            Socket.prototype.open = function (url) {
+                this.ws = new WebSocket(url);
+                this.ws.onopen = this._onOpen.bind(this);
+                this.ws.onmessage = this._onMessage.bind(this);
+                this.ws.onclose = this._onClose.bind(this);
+                this.ws.onerror = this._onClose.bind(this);
+                this.url = url;
+            };
+
+            Socket.prototype.send = function (command, args) {
+                this.ws.send(JSON.stringify({command: command, id: this.id, args: args}));
+            };
+
+            Socket.prototype._onOpen = function () {
+                this.send('mobile');
+            };
+
+            Socket.prototype._onMessage = function (event) {
+                var data = JSON.parse(event.data);
+
+                switch (data.command) {
+                    case 'id':
+                        this.id = data.args.id;
+                        var r = Math.abs(Math.min(250, this.id));
+                        var g = Math.abs(Math.min(200, this.id - r));
+                        var b = Math.abs(Math.min(100, this.id - r - g));
+                        document.body.style.background = 'rgb('+[r,g,b]+')';
+                        break;
+                }
+            };
+
+            Socket.prototype._onClose = function () {
+                setTimeout(function () {
+                    this.open(this.url);
+                }.bind(this), 4000);
+            };
+
+
+            //
+            // Main
+
+            window.addEventListener('load', function () {
+                new Ui({socket: new Socket('ws://' + window.location.host)});
+            }, false);
+        </script>
+    </head>
+    <body></body>
+</html>
+

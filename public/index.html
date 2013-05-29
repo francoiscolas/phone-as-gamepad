@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Phone As Gamepad (Desktop)</title>
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+        <script>
+            //
+            // Ui class
+
+            var Ui = function () {
+                this.spots = {};
+            };
+
+            Ui.prototype.move = function (id, x, y) {
+                var el = this.spots[id];
+
+                if (el === undefined) {
+                    var r = Math.abs(Math.min(250, id));
+                    var g = Math.abs(Math.min(200, id - r));
+                    var b = Math.abs(Math.min(100, id - r - g));
+                    el = this.spots[id] = $('<div class="spot"></div>').css('background', 'rgb('+[r,g,b]+')').appendTo('body');
+                }
+                el.stop().animate({top: y + '%', left: x + '%'}, 100);
+            };
+
+            Ui.prototype.stop = function (id) {
+                this.spots[id].remove();
+                this.spots[id] = undefined;
+            };
+
+
+            //
+            // Socket class
+
+            var Socket = function (options) {
+                this.ui = options.ui;
+                this.url = null;
+                this.open(options.url);
+            };
+
+            Socket.prototype.open = function (url) {
+                this.ws = new WebSocket(url);
+                this.ws.onopen = this._onOpen.bind(this);
+                this.ws.onmessage = this._onMessage.bind(this);
+                this.ws.onclose = this._onClose.bind(this);
+                this.ws.onerror = this._onClose.bind(this);
+                this.url = url;
+            };
+
+            Socket.prototype.send = function (command, args) {
+                this.ws.send(JSON.stringify({command: command, args: args}));
+            };
+
+            Socket.prototype._onOpen = function () {
+                console.log('Socket#_onOpen()');
+                this.send('desktop');
+            };
+
+            Socket.prototype._onMessage = function (e) {
+                var data = JSON.parse(e.data);
+
+                //console.log('Socket#_onMessage: data=', data);
+                switch (data.command) {
+                    case 'move':
+                        this.ui.move(data.args.id, data.args.x, data.args.y);
+                        break;
+                    case 'stop':
+                        this.ui.stop(data.args.id);
+                        break;
+                }
+            };
+
+            Socket.prototype._onClose = function () {
+                console.log('Socket#_onClose()');
+                setTimeout(function () {
+                    this.open(this.url);
+                }.bind(this), 4000);
+            };
+
+            //
+            // Main
+            $(function () {
+                new Socket({ui: new Ui(), url: 'ws://' + window.location.host});
+            });
+
+        </script>
+        <style>
+            .spot {
+                border-radius: 25px;
+                box-shadow: 0 0 10px #000000;
+                height: 50px;
+                position: absolute;
+                width: 50px;
+            }
+        </style>
+    </head>
+    <body></body>
+</html>
+
